@@ -66,9 +66,8 @@ class Ftp implements Adapter,
         if (!ftp_fget($this->getConnection(), $temp, $this->computePath($key), $this->mode)) {
             if ($this->retriesCount++ >= self::MAX_RETRIES) {
                 $this->connect();
-            } else {
-                return $this->read($key);
             }
+            return $this->read($key);
         }
 
         rewind($temp);
@@ -137,9 +136,8 @@ class Ftp implements Adapter,
         if (false === $lines) {
             if ($this->retriesCount++ >= self::MAX_RETRIES) {
                 $this->connect();
-            } else {
-                return $this->exists($key);
             }
+            return $this->exists($key);
         }
 
         if ($this->operationsCount++ >= self::MAX_OPERATIONS) {
@@ -514,8 +512,6 @@ class Ftp implements Adapter,
      */
     private function connect()
     {
-        echo "------------- FTP CONNECT------------\n\n";
-        
         // open ftp connection
         if (!$this->ssl) {
             $this->connection = ftp_connect($this->host, $this->port, 7);
