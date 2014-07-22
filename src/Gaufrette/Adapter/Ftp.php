@@ -17,6 +17,9 @@ class Ftp implements Adapter,
                      FileFactory,
                      ListKeysAware
 {
+    const MAX_RETRIES = 3;
+    const MAX_OPERATIONS = 100;
+
     protected $connection = null;
     protected $directory;
     protected $host;
@@ -28,6 +31,8 @@ class Ftp implements Adapter,
     protected $mode;
     protected $ssl;
     protected $fileData = array();
+    protected $retriesCount = 0;
+    protected $operationsCount = 0;
 
     /**
      * Constructor
@@ -59,12 +64,20 @@ class Ftp implements Adapter,
         $temp = fopen('php://temp', 'r+');
 
         if (!ftp_fget($this->getConnection(), $temp, $this->computePath($key), $this->mode)) {
-            return false;
+            if ($this->retriesCount++ >= self::MAX_RETRIES) {
+                $this->connect();
+            } else {
+                return $this->read($key);
+            }
         }
 
         rewind($temp);
         $contents = stream_get_contents($temp);
         fclose($temp);
+
+        if ($this->operationsCount++ >= self::MAX_OPERATIONS) {
+            $this->connect();
+        }
 
         return $contents;
     }
@@ -122,7 +135,15 @@ class Ftp implements Adapter,
         $lines = ftp_rawlist($this->getConnection(), '-al ' . dirname($file));
 
         if (false === $lines) {
-            return false;
+            if ($this->retriesCount++ >= self::MAX_RETRIES) {
+                $this->connect();
+            } else {
+                return $this->exists($key);
+            }
+        }
+
+        if ($this->operationsCount++ >= self::MAX_OPERATIONS) {
+            $this->connect();
         }
 
         $pattern = '{(?<!->) '.preg_quote(basename($file)).'( -> |$)}m';
@@ -493,12 +514,14 @@ class Ftp implements Adapter,
      */
     private function connect()
     {
+        echo "------------- FTP CONNECT------------\n\n";
+        
         // open ftp connection
         if (!$this->ssl) {
-            $this->connection = ftp_connect($this->host, $this->port);
+            $this->connection = ftp_connect($this->host, $this->port, 7);
         } else {
             if(function_exists('ftp_ssl_connect')) {
-                $this->connection = ftp_ssl_connect($this->host, $this->port);        
+                $this->connection = ftp_ssl_connect($this->host, $this->port, 7);
             } else {
                 throw new \RuntimeException('This Server Has No SSL-FTP Available.');
             }
@@ -537,6 +560,8 @@ class Ftp implements Adapter,
                 throw new \RuntimeException(sprintf('Could not change current directory for the \'%s\' directory.', $this->directory));
             }
         }
+        $this->retriesCount = 0;
+        $this->operationsCount  = 0;
     }
 
     /**
