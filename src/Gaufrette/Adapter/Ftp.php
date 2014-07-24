@@ -65,6 +65,7 @@ class Ftp implements Adapter,
 
         if (!ftp_fget($this->getConnection(), $temp, $this->computePath($key), $this->mode)) {
             if ($this->retriesCount++ >= self::MAX_RETRIES) {
+				$this->close();
                 $this->connect();
             }
             return $this->read($key);
@@ -75,6 +76,7 @@ class Ftp implements Adapter,
         fclose($temp);
 
         if ($this->operationsCount++ >= self::MAX_OPERATIONS) {
+			$this->close();
             $this->connect();
         }
 
@@ -135,12 +137,14 @@ class Ftp implements Adapter,
 
         if (false === $lines) {
             if ($this->retriesCount++ >= self::MAX_RETRIES) {
+				$this->close();
                 $this->connect();
             }
             return $this->exists($key);
         }
 
         if ($this->operationsCount++ >= self::MAX_OPERATIONS) {
+			$this->close();
             $this->connect();
         }
 
